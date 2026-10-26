@@ -1,0 +1,13 @@
+{
+  "id": "12-token-bucket-edge",
+  "target": "system-design-primitives",
+  "title": "TokenBucket refuses a request that exactly empties the bucket",
+  "kind": "operator",
+  "split": "test",
+  "truth": [
+    "dev.rakshit.sdp.ratelimit.TokenBucket#tryAcquire(String,int)"
+  ],
+  "file": "src/main/java/dev/rakshit/sdp/ratelimit/TokenBucket.java",
+  "failingTests": 5,
+  "hang": false
+}

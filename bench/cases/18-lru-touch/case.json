@@ -1,0 +1,13 @@
+{
+  "id": "18-lru-touch",
+  "target": "system-design-primitives",
+  "title": "LruCache.get no longer re-inserts the entry (loses it)",
+  "kind": "other",
+  "split": "dev",
+  "truth": [
+    "dev.rakshit.sdp.cache.LruCache#get(K)"
+  ],
+  "file": "src/main/java/dev/rakshit/sdp/cache/LruCache.java",
+  "failingTests": 1,
+  "hang": false
+}

@@ -1,0 +1,10 @@
+--- a/src/main/java/dev/rakshit/sdp/cache/LruCache.java
++++ b/src/main/java/dev/rakshit/sdp/cache/LruCache.java
+@@ -53,7 +53,6 @@
+         Node<K, V> n = index.get(key);
+         if (n == null) return null;
+         unlink(n);
+-        pushFront(n);
+         return n.value;
+     }
+ 

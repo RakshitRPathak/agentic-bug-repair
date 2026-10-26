@@ -1,0 +1,11 @@
+--- a/src/main/java/dev/rakshit/dsa/SlidingWindow.java
++++ b/src/main/java/dev/rakshit/dsa/SlidingWindow.java
+@@ -94,7 +94,7 @@
+         long sum = 0;
+         for (int r = 0; r < nums.length; r++) {
+             sum += nums[r];
+-            while (sum >= target) {
++            while (sum > target) {
+                 best = Math.min(best, r - l + 1);
+                 sum -= nums[l++];
+             }

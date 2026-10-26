@@ -1,0 +1,11 @@
+--- a/src/main/java/dev/rakshit/sdp/ratelimit/TokenBucket.java
++++ b/src/main/java/dev/rakshit/sdp/ratelimit/TokenBucket.java
+@@ -53,7 +53,7 @@
+         synchronized (b) {
+             double refilled = (now - b.lastRefillNanos) * refillPerNano;
+             if (refilled > 0) {
+-                b.tokens = Math.min(capacity, b.tokens + refilled);
++                b.tokens = Math.max(capacity, b.tokens + refilled);
+                 b.lastRefillNanos = now;
+             }
+             if (b.tokens >= permits) {

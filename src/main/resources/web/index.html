@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic bug repair</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="dot"></span> Agentic bug repair</div>
+  <div id="metrics" class="metrics" aria-live="polite"></div>
+</header>
+<div class="layout">
+  <aside class="side">
+    <form id="start" class="start">
+      <label for="repoPath">Repair a repository on this machine</label>
+      <div class="row">
+        <input id="repoPath" name="repoPath" placeholder="/path/to/repo with failing tests" autocomplete="off">
+        <button type="submit">Run</button>
+      </div>
+      <div id="startMsg" class="hint" role="status"></div>
+    </form>
+    <h2>Runs</h2>
+    <ul id="runs" class="runs"></ul>
+    <p id="noRuns" class="hint" hidden>No runs yet. Start one above, or point a GitHub webhook at <code>/webhooks/github</code>.</p>
+  </aside>
+  <main id="main" class="main">
+    <p class="hint">Select a run.</p>
+  </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

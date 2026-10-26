@@ -1,0 +1,13 @@
+{
+  "id": "06-unique-substring",
+  "target": "dsa-patterns",
+  "title": "longestUniqueSubstring forgets a repeat at the window's left edge",
+  "kind": "operator",
+  "split": "test",
+  "truth": [
+    "dev.rakshit.dsa.SlidingWindow#longestUniqueSubstring(String)"
+  ],
+  "file": "src/main/java/dev/rakshit/dsa/SlidingWindow.java",
+  "failingTests": 1,
+  "hang": false
+}

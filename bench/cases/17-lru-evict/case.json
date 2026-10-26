@@ -1,0 +1,13 @@
+{
+  "id": "17-lru-evict",
+  "target": "system-design-primitives",
+  "title": "LruCache evicts one entry too late",
+  "kind": "operator",
+  "split": "test",
+  "truth": [
+    "dev.rakshit.sdp.cache.LruCache#put(K,V)"
+  ],
+  "file": "src/main/java/dev/rakshit/sdp/cache/LruCache.java",
+  "failingTests": 5,
+  "hang": false
+}

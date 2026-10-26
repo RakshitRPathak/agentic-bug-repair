@@ -1,0 +1,13 @@
+{
+  "id": "05-dedupe-length",
+  "target": "dsa-patterns",
+  "title": "removeDuplicatesSorted returns one too few",
+  "kind": "other",
+  "split": "test",
+  "truth": [
+    "dev.rakshit.dsa.TwoPointers#removeDuplicatesSorted(int[])"
+  ],
+  "file": "src/main/java/dev/rakshit/dsa/TwoPointers.java",
+  "failingTests": 1,
+  "hang": false
+}

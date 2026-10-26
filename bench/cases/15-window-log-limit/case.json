@@ -1,0 +1,13 @@
+{
+  "id": "15-window-log-limit",
+  "target": "system-design-primitives",
+  "title": "SlidingWindowLog allows one request fewer than its limit",
+  "kind": "operator",
+  "split": "dev",
+  "truth": [
+    "dev.rakshit.sdp.ratelimit.SlidingWindowLog#tryAcquire(String,int)"
+  ],
+  "file": "src/main/java/dev/rakshit/sdp/ratelimit/SlidingWindowLog.java",
+  "failingTests": 2,
+  "hang": false
+}

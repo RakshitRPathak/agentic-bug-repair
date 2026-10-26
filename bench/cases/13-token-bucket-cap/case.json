@@ -1,0 +1,13 @@
+{
+  "id": "13-token-bucket-cap",
+  "target": "system-design-primitives",
+  "title": "TokenBucket refills past its capacity",
+  "kind": "other",
+  "split": "dev",
+  "truth": [
+    "dev.rakshit.sdp.ratelimit.TokenBucket#tryAcquire(String,int)"
+  ],
+  "file": "src/main/java/dev/rakshit/sdp/ratelimit/TokenBucket.java",
+  "failingTests": 1,
+  "hang": false
+}

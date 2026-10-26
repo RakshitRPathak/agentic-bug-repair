@@ -1,0 +1,13 @@
+{
+  "id": "14-window-log-expiry",
+  "target": "system-design-primitives",
+  "title": "SlidingWindowLog keeps an entry exactly one window old",
+  "kind": "operator",
+  "split": "test",
+  "truth": [
+    "dev.rakshit.sdp.ratelimit.SlidingWindowLog#tryAcquire(String,int)"
+  ],
+  "file": "src/main/java/dev/rakshit/sdp/ratelimit/SlidingWindowLog.java",
+  "failingTests": 1,
+  "hang": false
+}

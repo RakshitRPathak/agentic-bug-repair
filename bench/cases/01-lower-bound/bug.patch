@@ -1,0 +1,11 @@
+--- a/src/main/java/dev/rakshit/dsa/BinarySearch.java
++++ b/src/main/java/dev/rakshit/dsa/BinarySearch.java
+@@ -22,7 +22,7 @@
+         int lo = 0, hi = a.length;
+         while (lo < hi) {
+             int mid = lo + (hi - lo) / 2;
+-            if (a[mid] >= x) hi = mid;
++            if (a[mid] > x) hi = mid;
+             else lo = mid + 1;
+         }
+         return lo;

@@ -1,0 +1,13 @@
+{
+  "id": "08-min-subarray",
+  "target": "dsa-patterns",
+  "title": "minSubArrayLen ignores a window that exactly reaches the target",
+  "kind": "operator",
+  "split": "test",
+  "truth": [
+    "dev.rakshit.dsa.SlidingWindow#minSubArrayLen(int,int[])"
+  ],
+  "file": "src/main/java/dev/rakshit/dsa/SlidingWindow.java",
+  "failingTests": 1,
+  "hang": false
+}

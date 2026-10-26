@@ -1,0 +1,11 @@
+--- a/src/main/java/dev/rakshit/sdp/ratelimit/SlidingWindowLog.java
++++ b/src/main/java/dev/rakshit/sdp/ratelimit/SlidingWindowLog.java
+@@ -38,7 +38,7 @@
+         ArrayDeque<Long> log = logs.computeIfAbsent(key, k -> new ArrayDeque<>());
+         synchronized (log) {
+             // Timestamps are appended in order, so expired ones are always at the front.
+-            while (!log.isEmpty() && now - log.peekFirst() >= windowNanos) log.pollFirst();
++            while (!log.isEmpty() && now - log.peekFirst() > windowNanos) log.pollFirst();
+             if (log.size() + permits > limit) return false;
+             for (int i = 0; i < permits; i++) log.addLast(now);
+             return true;

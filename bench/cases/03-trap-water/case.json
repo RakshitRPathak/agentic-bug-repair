@@ -1,0 +1,13 @@
+{
+  "id": "03-trap-water",
+  "target": "dsa-patterns",
+  "title": "trap adds the wall height instead of subtracting it",
+  "kind": "operator",
+  "split": "dev",
+  "truth": [
+    "dev.rakshit.dsa.TwoPointers#trap(int[])"
+  ],
+  "file": "src/main/java/dev/rakshit/dsa/TwoPointers.java",
+  "failingTests": 1,
+  "hang": false
+}

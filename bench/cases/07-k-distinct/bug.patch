@@ -1,0 +1,11 @@
+--- a/src/main/java/dev/rakshit/dsa/SlidingWindow.java
++++ b/src/main/java/dev/rakshit/dsa/SlidingWindow.java
+@@ -41,7 +41,7 @@
+         int best = 0, l = 0;
+         for (int r = 0; r < s.length(); r++) {
+             counts.merge(s.charAt(r), 1, Integer::sum);
+-            while (counts.size() > k) {                   // invalid: shrink until valid again
++            while (counts.size() >= k) {                   // invalid: shrink until valid again
+                 char c = s.charAt(l++);
+                 if (counts.merge(c, -1, Integer::sum) == 0) counts.remove(c);
+             }

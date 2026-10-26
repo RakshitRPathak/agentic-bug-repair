@@ -1,0 +1,13 @@
+{
+  "id": "02-two-sum-direction",
+  "target": "dsa-patterns",
+  "title": "twoSumSorted moves the left pointer the wrong way",
+  "kind": "operator",
+  "split": "test",
+  "truth": [
+    "dev.rakshit.dsa.TwoPointers#twoSumSorted(int[],int)"
+  ],
+  "file": "src/main/java/dev/rakshit/dsa/TwoPointers.java",
+  "failingTests": 1,
+  "hang": false
+}

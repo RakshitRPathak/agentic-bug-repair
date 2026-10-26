@@ -1,0 +1,13 @@
+{
+  "id": "11-min-window-guard",
+  "target": "dsa-patterns",
+  "title": "minWindow counts surplus copies as progress",
+  "kind": "other",
+  "split": "test",
+  "truth": [
+    "dev.rakshit.dsa.SlidingWindow#minWindow(String,String)"
+  ],
+  "file": "src/main/java/dev/rakshit/dsa/SlidingWindow.java",
+  "failingTests": 1,
+  "hang": false
+}

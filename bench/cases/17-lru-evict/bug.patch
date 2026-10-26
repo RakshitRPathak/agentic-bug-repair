@@ -1,0 +1,11 @@
+--- a/src/main/java/dev/rakshit/sdp/cache/LruCache.java
++++ b/src/main/java/dev/rakshit/sdp/cache/LruCache.java
+@@ -66,7 +66,7 @@
+             pushFront(n);
+             return;
+         }
+-        if (index.size() == capacity) {
++        if (index.size() > capacity) {
+             Node<K, V> lru = tail.prev;
+             unlink(lru);
+             index.remove(lru.key);

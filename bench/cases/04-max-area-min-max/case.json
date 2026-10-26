@@ -1,0 +1,13 @@
+{
+  "id": "04-max-area-min-max",
+  "target": "dsa-patterns",
+  "title": "maxArea uses the taller wall instead of the shorter one",
+  "kind": "other",
+  "split": "test",
+  "truth": [
+    "dev.rakshit.dsa.TwoPointers#maxArea(int[])"
+  ],
+  "file": "src/main/java/dev/rakshit/dsa/TwoPointers.java",
+  "failingTests": 1,
+  "hang": false
+}

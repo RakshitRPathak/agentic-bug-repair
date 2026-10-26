@@ -1,0 +1,13 @@
+{
+  "id": "01-lower-bound",
+  "target": "dsa-patterns",
+  "title": "lowerBound returns the first index greater than x, not the first not-less-than x",
+  "kind": "operator",
+  "split": "dev",
+  "truth": [
+    "dev.rakshit.dsa.BinarySearch#lowerBound(int[],int)"
+  ],
+  "file": "src/main/java/dev/rakshit/dsa/BinarySearch.java",
+  "failingTests": 1,
+  "hang": false
+}

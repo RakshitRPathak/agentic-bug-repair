@@ -1,0 +1,11 @@
+--- a/src/main/java/dev/rakshit/dsa/SlidingWindow.java
++++ b/src/main/java/dev/rakshit/dsa/SlidingWindow.java
+@@ -112,7 +112,7 @@
+      */
+     public static int[] maxSlidingWindow(int[] nums, int k) {
+         if (k <= 0 || nums.length < k) return new int[0];
+-        int[] out = new int[nums.length - k + 1];
++        int[] out = new int[nums.length - k];
+         Deque<Integer> dq = new ArrayDeque<>();
+         for (int i = 0; i < nums.length; i++) {
+             while (!dq.isEmpty() && dq.peekFirst() <= i - k) dq.pollFirst();

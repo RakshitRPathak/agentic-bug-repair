@@ -1,0 +1,13 @@
+{
+  "id": "07-k-distinct",
+  "target": "dsa-patterns",
+  "title": "longestAtMostKDistinct shrinks the window one step too early",
+  "kind": "operator",
+  "split": "dev",
+  "truth": [
+    "dev.rakshit.dsa.SlidingWindow#longestAtMostKDistinct(String,int)"
+  ],
+  "file": "src/main/java/dev/rakshit/dsa/SlidingWindow.java",
+  "failingTests": 1,
+  "hang": false
+}

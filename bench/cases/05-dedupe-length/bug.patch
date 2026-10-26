@@ -1,0 +1,11 @@
+--- a/src/main/java/dev/rakshit/dsa/TwoPointers.java
++++ b/src/main/java/dev/rakshit/dsa/TwoPointers.java
+@@ -111,7 +111,7 @@
+         for (int fast = 1; fast < a.length; fast++) {
+             if (a[fast] != a[slow]) a[++slow] = a[fast];
+         }
+-        return slow + 1;
++        return slow;
+     }
+ 
+     /**

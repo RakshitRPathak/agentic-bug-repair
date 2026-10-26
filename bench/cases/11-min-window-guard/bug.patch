@@ -1,0 +1,11 @@
+--- a/src/main/java/dev/rakshit/dsa/SlidingWindow.java
++++ b/src/main/java/dev/rakshit/dsa/SlidingWindow.java
+@@ -65,7 +65,7 @@
+             char c = s.charAt(r);
+             Integer n = need.get(c);
+             if (n != null) {
+-                if (n > 0) missing--;
++                missing--;
+                 need.put(c, n - 1);                        // may go negative: a surplus copy
+             }
+             while (missing == 0) {                         // valid: record, then shrink while it stays valid

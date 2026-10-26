@@ -1,0 +1,13 @@
+{
+  "id": "10-sliding-max-size",
+  "target": "dsa-patterns",
+  "title": "maxSlidingWindow allocates one slot too few (crashes)",
+  "kind": "operator",
+  "split": "test",
+  "truth": [
+    "dev.rakshit.dsa.SlidingWindow#maxSlidingWindow(int[],int)"
+  ],
+  "file": "src/main/java/dev/rakshit/dsa/SlidingWindow.java",
+  "failingTests": 1,
+  "hang": false
+}

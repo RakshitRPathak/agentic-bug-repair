@@ -1,0 +1,11 @@
+--- a/src/main/java/dev/rakshit/dsa/TwoPointers.java
++++ b/src/main/java/dev/rakshit/dsa/TwoPointers.java
+@@ -73,7 +73,7 @@
+     public static int maxArea(int[] h) {
+         int l = 0, r = h.length - 1, best = 0;
+         while (l < r) {
+-            best = Math.max(best, Math.min(h[l], h[r]) * (r - l));
++            best = Math.max(best, Math.max(h[l], h[r]) * (r - l));
+             if (h[l] < h[r]) l++;
+             else r--;
+         }

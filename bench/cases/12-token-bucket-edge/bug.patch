@@ -1,0 +1,11 @@
+--- a/src/main/java/dev/rakshit/sdp/ratelimit/TokenBucket.java
++++ b/src/main/java/dev/rakshit/sdp/ratelimit/TokenBucket.java
+@@ -56,7 +56,7 @@
+                 b.tokens = Math.min(capacity, b.tokens + refilled);
+                 b.lastRefillNanos = now;
+             }
+-            if (b.tokens >= permits) {
++            if (b.tokens > permits) {
+                 b.tokens -= permits;
+                 return true;
+             }
