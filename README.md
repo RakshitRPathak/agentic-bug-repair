@@ -9,7 +9,7 @@ It can run from the command line, or as a service that reacts to failed GitHub b
 dashboard. Java 17+, **no dependencies**: the JDK compiler API is the parser, `com.sun.net.httpserver` is the server.
 
 The design follows SWE-agent / SWE-bench style systems, built small enough to read in a sitting (about 5,700 lines
-of Java, 470 of browser code, 147 tests). See [What this is not](#what-this-is-not) before comparing it to them.
+of Java, 470 of browser code, 147 tests). See [Limitations](#limitations) before comparing it to them.
 
 ![dashboard](docs/dashboard.png)
 
@@ -196,9 +196,7 @@ I also planted 14 bugs in the code itself (weakened signature check, removed pol
 - Responses carry `X-Content-Type-Options: nosniff`; the dashboard is served with `default-src 'self'`.
 - A patch can only change existing non-test source files, so the agent cannot rewrite the tests, the build or the CI to make them pass.
 
-## What this is not
-
-Read this before putting it on a CV or in front of an interviewer:
+## Limitations
 
 - **It is not SWE-bench-capable.** Without a model it fixes bugs that are one small edit away; with one it should do more, but that path (`AnthropicClient`, `LlmSynthesizer`) is tested only against stubs. I have not run it against the live API, so I make no claim about how well it works.
 - **Docker isolation has not been exercised.** `DockerSandbox` builds the command line and the tests check every flag, but the machine this was developed on had no Docker daemon, so no container has ever run. Test it yourself before trusting it with hostile code.

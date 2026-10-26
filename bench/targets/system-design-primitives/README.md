@@ -21,7 +21,7 @@ header comment.
 
 ## What the tests check
 
-The tests check the behaviour that matters in an interview, not just the happy path.
+The tests check edge cases and failure modes, not just the happy path.
 
 * **Caches** are run for 20,000 random operations against a reference: Java's `LinkedHashMap` in access
   order for LRU, and a deliberately slow, obviously correct scan-for-the-victim version for LFU.
@@ -36,7 +36,7 @@ The tests check the behaviour that matters in an interview, not just the happy p
   rate over 100,000 probes was 0.97%, using 11.7 KB where a `HashSet` of the same strings would hold
   the strings themselves.
 
-## Things worth knowing for the interview
+## Design notes
 
 * **Virtual nodes and imbalance.** Over 30 random rings of 5 nodes, the worst node's load deviated from
   its fair share by 111% on average with 1 point per node, 37% with 10, 10% with 200 and 5% with 1,000
