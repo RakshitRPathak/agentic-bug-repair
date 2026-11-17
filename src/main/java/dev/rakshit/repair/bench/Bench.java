@@ -16,6 +16,7 @@ import dev.rakshit.repair.sandbox.Limits;
 import dev.rakshit.repair.sandbox.ProcessSandbox;
 import dev.rakshit.repair.sandbox.Sandbox;
 import dev.rakshit.repair.synth.MutationSynthesizer;
+import dev.rakshit.repair.synth.SynthesizerConfig;
 import dev.rakshit.repair.synth.PatchSynthesizer;
 import dev.rakshit.repair.trace.TestRun;
 import dev.rakshit.repair.util.Fs;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -48,7 +50,8 @@ public final class Bench {
     public record LocResult(String caseId, String kind, String split, Map<String, Integer> rankByVariant) {}
 
     public record RepairResult(String caseId, String kind, String split, boolean resolved, boolean restoredOriginal, int rounds,
-                               int candidates, int sandboxRuns, long latencyMs, String outcome, String fix) {}
+                               int candidates, int sandboxRuns, long latencyMs, String outcome, String fix,
+                               int modelCalls, long inputTokens, long outputTokens) {}
 
     private static final Map<String, Weights> VARIANTS = new LinkedHashMap<>();
 
@@ -186,7 +189,8 @@ public final class Bench {
             }
             String fix = run.resolved() ? firstLine(run.rationale()) : "";
             return new RepairResult(c.id(), c.kind(), c.split(), run.resolved(), restored, run.round(), run.attempts().size(),
-                    run.sandboxRuns(), run.latencyMs(), run.outcome(), fix);
+                    run.sandboxRuns(), run.latencyMs(), run.outcome(), fix,
+                    run.usage().calls(), run.usage().inputTokens(), run.usage().outputTokens());
         } finally {
             Fs.deleteTree(repo);
         }
@@ -228,7 +232,14 @@ public final class Bench {
         return m;
     }
 
+    public static final String MUTATION_LABEL = "offline mutation synthesizer, no model";
+
     public static String report(List<LocResult> loc, List<RepairResult> rep) {
+        return report(loc, rep, MUTATION_LABEL);
+    }
+
+    /** @param synth what produced the patches, for the repair table's heading (e.g. the model and server) */
+    public static String report(List<LocResult> loc, List<RepairResult> rep, String synth) {
         StringBuilder sb = new StringBuilder();
         if (!loc.isEmpty()) {
             sb.append("### Fault localization (").append(loc.size()).append(" bugs)\n\n");
@@ -259,7 +270,7 @@ public final class Bench {
                     if (r.restoredOriginal()) restored++;
                 }
             }
-            sb.append("### Repair (").append(rep.size()).append(" bugs, offline mutation synthesizer, no model)\n\n");
+            sb.append("### Repair (").append(rep.size()).append(" bugs, ").append(synth).append(")\n\n");
             sb.append(String.format("Resolved (passes every test on a clean checkout): **%d / %d (%.0f%%)**; source identical to the original: %d. "
                             + "Latency of resolved runs: median %.0f s, p95 %.0f s.%n%n", resolved, rep.size(), 100.0 * resolved / rep.size(), restored,
                     Percentile.nearestRank(lat, 50) / 1000.0, Percentile.nearestRank(lat, 95) / 1000.0));
@@ -269,11 +280,24 @@ public final class Bench {
                 long ok = part.stream().filter(RepairResult::resolved).count();
                 sb.append(String.format("- Bugs %s: %d / %d resolved%n", kind.equals("operator") ? "fixable by one small edit" : "needing new code or a different kind of edit", ok, part.size()));
             }
-            sb.append("\n| Case | Kind | Resolved | Rounds | Candidates verified | Time | Fix found |\n|---|---|---|---|---|---|---|\n");
+            int calls = rep.stream().mapToInt(RepairResult::modelCalls).sum();
+            boolean model = calls > 0;
+            if (model) {
+                long in = rep.stream().mapToLong(RepairResult::inputTokens).sum(), out = rep.stream().mapToLong(RepairResult::outputTokens).sum();
+                sb.append(String.format("%nModel calls: %d in total, %d input and %d output tokens (%.0f input tokens per call).%n",
+                        calls, in, out, (double) in / calls));
+            }
+            sb.append(model ? "\n| Case | Kind | Resolved | Rounds | Candidates verified | Model calls | Time | Fix found |\n|---|---|---|---|---|---|---|---|\n"
+                    : "\n| Case | Kind | Resolved | Rounds | Candidates verified | Time | Fix found |\n|---|---|---|---|---|---|---|\n");
             for (RepairResult r : rep) {
-                sb.append(String.format("| %s | %s | %s | %d | %d | %.0f s | %s |%n", r.caseId(), r.kind(),
-                        r.resolved() ? (r.restoredOriginal() ? "yes (original restored)" : "yes (differs from original)") : "no",
-                        r.rounds(), r.candidates(), r.latencyMs() / 1000.0, r.resolved() ? r.fix().replace("|", "\\|") : "-"));
+                String status = r.resolved() ? (r.restoredOriginal() ? "yes (original restored)" : "yes (differs from original)") : "no";
+                String fix = r.resolved() ? r.fix().replace("|", "\\|") : "-";
+                if (model)
+                    sb.append(String.format("| %s | %s | %s | %d | %d | %d | %.0f s | %s |%n", r.caseId(), r.kind(), status,
+                            r.rounds(), r.candidates(), r.modelCalls(), r.latencyMs() / 1000.0, fix));
+                else
+                    sb.append(String.format("| %s | %s | %s | %d | %d | %.0f s | %s |%n", r.caseId(), r.kind(), status,
+                            r.rounds(), r.candidates(), r.latencyMs() / 1000.0, fix));
             }
         }
         return sb.toString();
@@ -298,6 +322,9 @@ public final class Bench {
             e.put("latencyMs", r.latencyMs());
             e.put("outcome", r.outcome());
             e.put("fix", r.fix());
+            e.put("modelCalls", r.modelCalls());
+            e.put("inputTokens", r.inputTokens());
+            e.put("outputTokens", r.outputTokens());
             p.add(e);
         }
         m.put("repair", p);
@@ -309,12 +336,14 @@ public final class Bench {
     public static void main(String[] args) throws Exception {
         Path dir = Path.of("bench");
         String mode = "both";
+        SynthesizerConfig.Mode synthMode = SynthesizerConfig.Mode.MUTATION;
         List<String> only = new ArrayList<>();
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--dir" -> dir = Path.of(args[++i]);
                 case "--mode" -> mode = args[++i];
                 case "--cases" -> only.addAll(List.of(args[++i].split(",")));
+                case "--synth" -> synthMode = SynthesizerConfig.Mode.parse(args[++i]);
                 default -> throw new IllegalArgumentException("unknown option " + args[i]);
             }
         }
@@ -322,6 +351,11 @@ public final class Bench {
         if (!only.isEmpty()) cases = cases.stream().filter(c -> only.stream().anyMatch(o -> c.id().startsWith(o))).toList();
         Sandbox sandbox = new ProcessSandbox();
         RepairConfig cfg = RepairConfig.defaults().withLimits(Limits.defaults().withTimeout(30_000));
+        Supplier<PatchSynthesizer> synth = SynthesizerConfig.fromEnv(System.getenv(), synthMode);
+        String label = synthMode == SynthesizerConfig.Mode.MUTATION ? MUTATION_LABEL
+                : (synthMode == SynthesizerConfig.Mode.MODEL_ONLY ? "model only: " : "mutation first, then model: ")
+                + SynthesizerConfig.describeModel(System.getenv());
+        if (synthMode != SynthesizerConfig.Mode.MUTATION) System.err.println("synthesizer: " + label);
         if (mode.equals("tune")) {
             System.out.println(tune(cases, sandbox, cfg));
             return;
@@ -336,16 +370,22 @@ public final class Bench {
                 System.err.println("   ranks: " + r.rankByVariant());
             }
             if (mode.equals("both") || mode.equals("repair")) {
-                RepairResult r = repair(c, sandbox, new MutationSynthesizer(), cfg);
+                RepairResult r = repair(c, sandbox, synth.get(), cfg);
                 rep.add(r);
                 System.err.println("   repair: " + (r.resolved() ? "RESOLVED " : "unresolved ") + r.candidates() + " candidates, " + r.latencyMs() / 1000 + " s - " + r.outcome());
             }
         }
-        String text = report(loc, rep);
+        String text = report(loc, rep, label);
         System.out.println(text);
         Path results = dir.resolve("results");
         Files.createDirectories(results);
-        Files.writeString(results.resolve("RESULTS.md"), text, StandardCharsets.UTF_8);
-        Files.writeString(results.resolve("results.json"), Json.write(toJson(loc, rep)), StandardCharsets.UTF_8);
+        // Model runs get their own files so the offline baseline in RESULTS.md is never overwritten.
+        String suffix = synthMode == SynthesizerConfig.Mode.MUTATION ? ""
+                : "_" + (synthMode == SynthesizerConfig.Mode.MODEL_ONLY ? "model-only" : "model") + "_"
+                + System.getenv().getOrDefault("REPAIR_MODEL", "model").replaceAll("[^A-Za-z0-9.-]+", "-");
+        Map<String, Object> json = toJson(loc, rep);
+        json.put("synthesizer", label);
+        Files.writeString(results.resolve("RESULTS" + suffix + ".md"), text, StandardCharsets.UTF_8);
+        Files.writeString(results.resolve("results" + suffix + ".json"), Json.write(json), StandardCharsets.UTF_8);
     }
 }

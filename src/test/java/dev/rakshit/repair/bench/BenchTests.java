@@ -91,8 +91,8 @@ public class BenchTests {
         assertEquals((1.0 + 0.5 + 0.25 + 0.0) / 4, m.get("mrr"));
 
         List<Bench.RepairResult> rep = List.of(
-                new Bench.RepairResult("a", "operator", "dev", true, true, 1, 3, 5, 10_000, "ok", "replace > with >="),
-                new Bench.RepairResult("b", "other", "test", false, false, 4, 32, 40, 100_000, "no fix", ""));
+                new Bench.RepairResult("a", "operator", "dev", true, true, 1, 3, 5, 10_000, "ok", "replace > with >=", 0, 0, 0),
+                new Bench.RepairResult("b", "other", "test", false, false, 4, 32, 40, 100_000, "no fix", "", 0, 0, 0));
         String md = Bench.report(loc, rep);
         assertTrue(md.contains("### Fault localization (4 bugs)") && md.contains("| full (graph + trace + text) | 25% | 50% | 75% | 0.44 |"), md);
         assertTrue(md.contains("**1 / 2 (50%)**") && md.contains("yes (original restored)") && md.contains("Bugs fixable by one small edit: 1 / 1"), md);
