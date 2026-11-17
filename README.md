@@ -173,6 +173,21 @@ trace-only baseline is nearly blind; that is the realistic situation for logic b
 - Resolved runs: median 28 s, p95 50 s (a run is dominated by the sandboxed test runs, 7–8 s each here).
 - 3 of the 11 were fixed in the first round; the rest needed the critic loop.
 
+**With a local model** (`--synth model`: mutations for 2 rounds, then qwen2.5-coder:7b under Ollama on a laptop
+RTX 5050, 2 samples at temperature 0.7). Table: [`RESULTS_model_qwen2.5-coder-7b.md`](bench/results/RESULTS_model_qwen2.5-coder-7b.md).
+
+| Run | Resolved | Model calls | What the model added |
+|---|---|---|---|
+| 1 (before the fix below) | 11 / 17 | 28 | fixed **05** (needs new code, which mutation cannot do), but **03** was lost |
+| 2 (current code) | **11 / 17** | 26 · 66k in / 4.7k out tokens | nothing: 03 back, 05 not fixed this time |
+
+- Run 1 found a design flaw: once the model took over in round 3, the mutation search stopped, and 03's mutation fix only
+  comes up in round 3. Later rounds now verify the model's candidates and then the untried mutations, and run 2 fixed
+  03 in round 3. (Run 1's raw files were overwritten by run 2; its numbers are in the commit history.)
+- A 7B local model fixed one of the five bugs mutation cannot fix, in one of two runs. That is the honest size of its
+  contribution here: **with the current code a run should land at 11–12 of 17**, and two runs are too few to say more.
+- Resolved runs took a median of 8 s on the laptop, versus 28 s on the 2-core machine above; that gap is hardware.
+
 What the numbers do and do not say:
 
 - The graph did **not** make top-1 better than plain text + trace on these repos (47% vs 59%, a difference of two
@@ -183,8 +198,8 @@ What the numbers do and do not say:
   but **worse on the held-out test split (0.77 vs 0.83)**, so the defaults were kept (`bench --mode tune`).
 - I wrote the bugs and the tool. They are plausible logic bugs, not a sample of real-world ones, and they are far
   easier than SWE-bench issues. **These figures are not comparable with SWE-bench scores.**
-- The model-backed path has no benchmark numbers yet. It now runs end to end against any OpenAI-compatible server (see
-  [Running it with a local model](#running-it-with-a-local-model)), but it has not been benchmarked with a real model.
+- The model-backed numbers come from one small local model (qwen2.5-coder:7b) and two runs. A larger model would very
+  likely do more; I have not measured one.
 
 ## Verification
 
@@ -236,7 +251,7 @@ warning are not model results.
 
 ## Limitations
 
-- **It is not SWE-bench-capable.** Without a model it fixes bugs that are one small edit away; with one it should do more. That path runs end to end against an OpenAI-compatible server (a fake one in the checks above), but it has not been run with a real model, so I make no claim about how well it works.
+- **It is not SWE-bench-capable.** Without a model it fixes bugs that are one small edit away; with one it should do more. A local 7B model added at most one fix in two runs (see [Measured results](#measured-results)); a stronger model has not been measured.
 - **Docker isolation has not been exercised.** `DockerSandbox` builds the command line and the tests check every flag, but the machine this was developed on had no Docker daemon, so no container has ever run. Test it yourself before trusting it with hostile code.
 - **A real GitHub pull request has not been opened.** The publisher is tested against a local remote and a fake API, not against github.com.
 - **Java only,** and only projects whose tests print `PASS`/`FAIL` lines the bundled way (parsing JUnit/Surefire reports is the obvious next step).
