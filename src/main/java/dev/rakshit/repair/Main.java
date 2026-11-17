@@ -13,11 +13,8 @@ import dev.rakshit.repair.sandbox.Sandboxes;
 import dev.rakshit.repair.service.HttpApi;
 import dev.rakshit.repair.service.RepairService;
 import dev.rakshit.repair.service.ServiceConfig;
-import dev.rakshit.repair.synth.AnthropicClient;
-import dev.rakshit.repair.synth.CascadeSynthesizer;
-import dev.rakshit.repair.synth.LlmSynthesizer;
-import dev.rakshit.repair.synth.MutationSynthesizer;
 import dev.rakshit.repair.synth.PatchSynthesizer;
+import dev.rakshit.repair.synth.SynthesizerConfig;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -41,11 +38,17 @@ public final class Main {
                   --repo: repositories the GitHub webhook may trigger repairs for.
               demo [--bench bench] [--port 8080] [--cases 01,02,03]
                   Start the dashboard and repair a few bundled buggy projects so there is something to look at.
-              bench [--dir bench] [--mode localize|repair|both|tune] [--cases 01,02]
-                  Run the benchmark and print the results tables.
+              bench [--dir bench] [--mode localize|repair|both|tune] [--cases 01,02] [--synth mutation|model|model-only]
+                  Run the benchmark and print the results tables. --synth model / model-only need a model (below).
 
-            Environment: ANTHROPIC_API_KEY (use a model for hard bugs; REPAIR_MODEL picks it), GITHUB_TOKEN (open real draft
-            pull requests), WEBHOOK_SECRET (enable POST /webhooks/github), REPAIR_API_KEY (required to bind a non-loopback host).
+            Model for hard bugs (optional; without one the offline mutation synthesizer is used):
+              REPAIR_LLM_URL + REPAIR_MODEL   any OpenAI-compatible server, e.g. a local model:
+                                              REPAIR_LLM_URL=http://localhost:11434/v1 REPAIR_MODEL=qwen2.5-coder:7b  (Ollama)
+                                              REPAIR_LLM_API_KEY if the server wants one; REPAIR_LLM_TIMEOUT_S (default 300)
+              ANTHROPIC_API_KEY               the Anthropic API (REPAIR_MODEL defaults to claude-sonnet-5-5)
+              REPAIR_SAMPLES                  replies requested per round (default 2)
+            Other: GITHUB_TOKEN (open real draft pull requests), WEBHOOK_SECRET (enable POST /webhooks/github),
+            REPAIR_API_KEY (required to bind a non-loopback host).
             """;
 
     public static void main(String[] args) throws Exception {
@@ -67,11 +70,7 @@ public final class Main {
     }
 
     static Supplier<PatchSynthesizer> synthesizerFromEnv() {
-        String key = System.getenv("ANTHROPIC_API_KEY");
-        if (key == null || key.isBlank()) return MutationSynthesizer::new;
-        String model = System.getenv().getOrDefault("REPAIR_MODEL", "claude-sonnet-5-5");
-        return () -> new CascadeSynthesizer(new MutationSynthesizer(),
-                new LlmSynthesizer(new AnthropicClient(key, model, AnthropicClient.DEFAULT_URL), 2), 2);
+        return SynthesizerConfig.fromEnv(System.getenv(), SynthesizerConfig.Mode.CASCADE);
     }
 
     private static void repair(String[] args) throws Exception {

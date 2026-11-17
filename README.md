@@ -9,7 +9,7 @@ It can run from the command line, or as a service that reacts to failed GitHub b
 dashboard. Java 17+, **no dependencies**: the JDK compiler API is the parser, `com.sun.net.httpserver` is the server.
 
 The design follows SWE-agent / SWE-bench style systems, built small enough to read in a sitting (about 5,700 lines
-of Java, 470 of browser code, 147 tests). See [Limitations](#limitations) before comparing it to them.
+of Java, 470 of browser code, 155 tests). See [Limitations](#limitations) before comparing it to them.
 
 ![dashboard](docs/dashboard.png)
 
@@ -80,7 +80,7 @@ and the passing ones do not), *stack frame* (position in the stack trace when th
 | Synthesizer | Needs | What it does |
 |---|---|---|
 | `MutationSynthesizer` (default) | nothing | Enumerates single-edit changes (13 operators: flip `<`/`<=`, `+`/`-`, `&&`/`\|\|`, off-by-one constants, array index, negated condition, swapped arguments, …) inside the top suspects, ranks them by operator prior × suspect score, boosts the line in the stack trace. Deterministic, free, offline. |
-| `LlmSynthesizer` | `ANTHROPIC_API_KEY` | Prompt = failing tests + suspect with line numbers + 2-hop graph context + critic feedback; asks for one diff; **dry-run applies it** before returning it, and tells the model why a diff was rejected. |
+| `LlmSynthesizer` | a model: any OpenAI-compatible server (`REPAIR_LLM_URL`, e.g. a local model under Ollama) or `ANTHROPIC_API_KEY` | Prompt = failing tests + suspect with line numbers + 2-hop graph context + critic feedback; asks for one diff; **dry-run applies it** before returning it, and tells the model why a diff was rejected. |
 | `CascadeSynthesizer` | both | Mutations for the first 2 rounds, the model only when they are exhausted, so most small bugs cost no tokens. |
 
 **Gate and verification** (`agent/PatchPolicy`, `agent/Verifier`). Before anything runs, a patch must modify only
@@ -132,8 +132,19 @@ at phone width, strict CSP (no inline scripts; all dynamic text is inserted as t
 | `demo [--cases 01,10,17]` | `serve` plus a few bundled buggy projects; never contacts GitHub |
 | `bench [--mode localize\|repair\|both\|tune] [--cases 01,02]` | benchmark |
 
-Environment: `ANTHROPIC_API_KEY` (and `REPAIR_MODEL`, default `claude-sonnet-5-5`), `GITHUB_TOKEN`, `WEBHOOK_SECRET`,
-`REPAIR_API_KEY` (required to bind anything other than loopback). The test command is any command that compiles,
+`bench` also takes `--synth mutation|model|model-only`: `model` is the cascade (mutations first, then the model),
+`model-only` measures the model alone. Model runs write `bench/results/RESULTS_<synth>_<model>.md` and never overwrite
+the offline baseline in `RESULTS.md`; their tables add model calls and token counts.
+
+Model (optional; without one the offline mutation synthesizer is used):
+
+| Variable | Meaning |
+|---|---|
+| `REPAIR_LLM_URL` + `REPAIR_MODEL` | any OpenAI-compatible server: Ollama (`http://localhost:11434/v1`), LM Studio (`http://localhost:1234/v1`), llama.cpp, vLLM, or a hosted gateway. `REPAIR_LLM_API_KEY` if it wants a key, `REPAIR_LLM_TIMEOUT_S` (default 300) per request. `<think>` blocks from reasoning models are dropped. |
+| `ANTHROPIC_API_KEY` | the Anthropic API; `REPAIR_MODEL` defaults to `claude-sonnet-5-5` |
+| `REPAIR_SAMPLES` | replies requested per round (default 2) |
+
+Other: `GITHUB_TOKEN`, `WEBHOOK_SECRET`, `REPAIR_API_KEY` (required to bind anything other than loopback). The test command is any command that compiles,
 runs the tests and prints `PASS`/`FAIL` lines the way the bundled testkit does (`--cmd` changes it); `trace/TestOutputParser`
 is the one place that would change to read JUnit output.
 
@@ -172,11 +183,12 @@ What the numbers do and do not say:
   but **worse on the held-out test split (0.77 vs 0.83)**, so the defaults were kept (`bench --mode tune`).
 - I wrote the bugs and the tool. They are plausible logic bugs, not a sample of real-world ones, and they are far
   easier than SWE-bench issues. **These figures are not comparable with SWE-bench scores.**
-- The model-backed path has no benchmark numbers: it was not run against the live API.
+- The model-backed path has no benchmark numbers yet. It now runs end to end against any OpenAI-compatible server (see
+  [Running it with a local model](#running-it-with-a-local-model)), but it has not been benchmarked with a real model.
 
 ## Verification
 
-`./build.sh` runs 147 tests. Notable ones:
+`./build.sh` runs 155 tests. Notable ones:
 
 - the diff engine is checked against `git apply` in both directions (including a 120-case fuzz), and refuses path traversal and partial application;
 - the state machine's table is checked for reachability, terminal states, and an `ERROR` edge from every working state;
@@ -184,9 +196,35 @@ What the numbers do and do not say:
 - the sandbox tests check isolation, not just success: the caller's directory is untouched, no secrets in the environment, children die with the parent, a fork bomb trips the limit, runaway output is capped, memory hogs are stopped, and (where the kernel allows) the network namespace has only a loopback device;
 - the service tests cover the full path webhook → clone from a local bare repo → repair → approve → files on disk over real HTTP, every webhook status code, duplicates, backpressure, oversized bodies, API keys, and the browser-attack checks below;
 - the GitHub publisher is tested against a local bare remote and a stub of the REST API: the branch contains exactly one commit with the fix, `main` is untouched, the PR is a draft, and the token never appears in an error message;
-- the benchmark data is checked too: every `bug.patch` applies, compiles, targets a method that exists, and every target is green before a bug is planted.
+- the benchmark data is checked too: every `bug.patch` applies, compiles, targets a method that exists, and every target is green before a bug is planted;
+- the OpenAI-compatible client is tested against a local HTTP stub: request shape, bearer token only when a key is set, the key never in errors, retries on 429/5xx but not 4xx, a clear error when no server is listening, and `<think>` blocks removed (the test shows the diff inside the reasoning would otherwise be the one picked).
+
+The model path was also run end to end through `bench` with a fake OpenAI-compatible server that answers with each
+bug's true fix: bug 08 was fixed by the model alone, bug 13 (which needs new code) by the cascade after two rounds of
+mutations, and a reply whose diff did not match the file was rejected before any sandbox time was spent. That server
+is an oracle, so this checks the plumbing, not any model's ability.
 
 I also planted 14 bugs in the code itself (weakened signature check, removed policy check, wrong percentile, skipped final re-verification, dropped partial-fix file, `--network bridge`, …) to see whether the tests notice. They did, after I added two tests for the two that first survived.
+
+## Running it with a local model
+
+Ollama or LM Studio serve the OpenAI-compatible API, so the model path runs on a laptop GPU with no API key or cost.
+With Ollama under WSL2 or Linux (an 8 GB GPU fits a 7–8B coder model in 4-bit):
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh                  # once
+OLLAMA_CONTEXT_LENGTH=8192 ollama serve &                      # prompts run 1–4k tokens; small default contexts truncate them
+ollama pull qwen2.5-coder:7b
+export REPAIR_LLM_URL=http://localhost:11434/v1 REPAIR_MODEL=qwen2.5-coder:7b
+java -cp out/main dev.rakshit.repair.Main bench --mode repair --synth model-only   # the model alone
+java -cp out/main dev.rakshit.repair.Main bench --mode repair --synth model        # mutations first, then the model
+```
+
+A model benchmark sends one tiny request before it starts and exits with status 2 if the server does not answer it
+properly, so a misconfigured server never produces a results table. If the model fails partway through, the cascade
+falls back to the mutation candidates it has not tried yet, so an outage cannot lose a bug the offline synthesizer
+fixes. The report then warns that the model failed in N bugs, and the run exits with status 1. Results with that
+warning are not model results.
 
 ## Security notes
 
@@ -198,7 +236,7 @@ I also planted 14 bugs in the code itself (weakened signature check, removed pol
 
 ## Limitations
 
-- **It is not SWE-bench-capable.** Without a model it fixes bugs that are one small edit away; with one it should do more, but that path (`AnthropicClient`, `LlmSynthesizer`) is tested only against stubs. I have not run it against the live API, so I make no claim about how well it works.
+- **It is not SWE-bench-capable.** Without a model it fixes bugs that are one small edit away; with one it should do more. That path runs end to end against an OpenAI-compatible server (a fake one in the checks above), but it has not been run with a real model, so I make no claim about how well it works.
 - **Docker isolation has not been exercised.** `DockerSandbox` builds the command line and the tests check every flag, but the machine this was developed on had no Docker daemon, so no container has ever run. Test it yourself before trusting it with hostile code.
 - **A real GitHub pull request has not been opened.** The publisher is tested against a local remote and a fake API, not against github.com.
 - **Java only,** and only projects whose tests print `PASS`/`FAIL` lines the bundled way (parsing JUnit/Surefire reports is the obvious next step).
@@ -211,7 +249,7 @@ I also planted 14 bugs in the code itself (weakened signature check, removed pol
 ```
 src/main/java/dev/rakshit/repair/
   graph/      code property graph (JDK compiler API)        retrieval/  BM25, hashed vectors, rank fusion
-  localize/   fault localizer, GraphRAG context              synth/      mutation, LLM, cascade, Anthropic client
+  localize/   fault localizer, GraphRAG context              synth/      mutation, LLM, cascade, Anthropic + OpenAI-compatible clients
   agent/      state machine, pipeline, policy, verifier      sandbox/    process and Docker sandboxes
   patch/      unified diff create / parse / apply            pr/         dry-run and GitHub publishers
   service/    webhook, queue, HTTP API, run store            metrics/    pass@k, percentiles, cost
