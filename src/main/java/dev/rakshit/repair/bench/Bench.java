@@ -15,6 +15,7 @@ import dev.rakshit.repair.retrieval.HybridRetriever;
 import dev.rakshit.repair.sandbox.Limits;
 import dev.rakshit.repair.sandbox.ProcessSandbox;
 import dev.rakshit.repair.sandbox.Sandbox;
+import dev.rakshit.repair.synth.CascadeSynthesizer;
 import dev.rakshit.repair.synth.MutationSynthesizer;
 import dev.rakshit.repair.synth.SynthesizerConfig;
 import dev.rakshit.repair.synth.PatchSynthesizer;
@@ -51,7 +52,7 @@ public final class Bench {
 
     public record RepairResult(String caseId, String kind, String split, boolean resolved, boolean restoredOriginal, int rounds,
                                int candidates, int sandboxRuns, long latencyMs, String outcome, String fix,
-                               int modelCalls, long inputTokens, long outputTokens) {}
+                               int modelCalls, long inputTokens, long outputTokens, int modelErrors) {}
 
     private static final Map<String, Weights> VARIANTS = new LinkedHashMap<>();
 
@@ -190,7 +191,8 @@ public final class Bench {
             String fix = run.resolved() ? firstLine(run.rationale()) : "";
             return new RepairResult(c.id(), c.kind(), c.split(), run.resolved(), restored, run.round(), run.attempts().size(),
                     run.sandboxRuns(), run.latencyMs(), run.outcome(), fix,
-                    run.usage().calls(), run.usage().inputTokens(), run.usage().outputTokens());
+                    run.usage().calls(), run.usage().inputTokens(), run.usage().outputTokens(),
+                    (synth instanceof CascadeSynthesizer cs ? cs.modelErrors() : 0) + (isModelFailure(run.outcome()) ? 1 : 0));
         } finally {
             Fs.deleteTree(repo);
         }
@@ -233,6 +235,10 @@ public final class Bench {
     }
 
     public static final String MUTATION_LABEL = "offline mutation synthesizer, no model";
+
+    static boolean isModelFailure(String outcome) {
+        return outcome != null && (outcome.contains("model server") || outcome.contains("Anthropic API"));
+    }
 
     public static String report(List<LocResult> loc, List<RepairResult> rep) {
         return report(loc, rep, MUTATION_LABEL);
@@ -282,6 +288,11 @@ public final class Bench {
             }
             int calls = rep.stream().mapToInt(RepairResult::modelCalls).sum();
             boolean model = calls > 0;
+            long failedCases = rep.stream().filter(r -> r.modelErrors() > 0).count();
+            if (failedCases > 0)
+                sb.append(String.format("%n**Warning: the model failed in %d of %d bugs** (%d failed rounds in total); those rounds fell back to "
+                        + "the offline synthesizer or ended the run. These are not model results.%n", failedCases, rep.size(),
+                        rep.stream().mapToInt(RepairResult::modelErrors).sum()));
             if (model) {
                 long in = rep.stream().mapToLong(RepairResult::inputTokens).sum(), out = rep.stream().mapToLong(RepairResult::outputTokens).sum();
                 sb.append(String.format("%nModel calls: %d in total, %d input and %d output tokens (%.0f input tokens per call).%n",
@@ -325,6 +336,7 @@ public final class Bench {
             e.put("modelCalls", r.modelCalls());
             e.put("inputTokens", r.inputTokens());
             e.put("outputTokens", r.outputTokens());
+            e.put("modelErrors", r.modelErrors());
             p.add(e);
         }
         m.put("repair", p);
@@ -355,7 +367,17 @@ public final class Bench {
         String label = synthMode == SynthesizerConfig.Mode.MUTATION ? MUTATION_LABEL
                 : (synthMode == SynthesizerConfig.Mode.MODEL_ONLY ? "model only: " : "mutation first, then model: ")
                 + SynthesizerConfig.describeModel(System.getenv());
-        if (synthMode != SynthesizerConfig.Mode.MUTATION) System.err.println("synthesizer: " + label);
+        if (synthMode != SynthesizerConfig.Mode.MUTATION) {
+            System.err.println("synthesizer: " + label);
+            // One tiny request first: a misconfigured or broken model server should stop the run here, not produce a
+            // results table in which the model never took part.
+            try {
+                SynthesizerConfig.modelFromEnv(System.getenv()).complete("Reply with the single word OK.", "OK?", 8, 0);
+            } catch (IOException e) {
+                System.err.println("the model is not answering, so no benchmark was run: " + e.getMessage());
+                System.exit(2);
+            }
+        }
         if (mode.equals("tune")) {
             System.out.println(tune(cases, sandbox, cfg));
             return;
@@ -387,5 +409,6 @@ public final class Bench {
         json.put("synthesizer", label);
         Files.writeString(results.resolve("RESULTS" + suffix + ".md"), text, StandardCharsets.UTF_8);
         Files.writeString(results.resolve("results" + suffix + ".json"), Json.write(json), StandardCharsets.UTF_8);
+        if (rep.stream().anyMatch(r -> r.modelErrors() > 0)) System.exit(1);  // the warning is in the report too
     }
 }

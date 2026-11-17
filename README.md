@@ -220,6 +220,12 @@ java -cp out/main dev.rakshit.repair.Main bench --mode repair --synth model-only
 java -cp out/main dev.rakshit.repair.Main bench --mode repair --synth model        # mutations first, then the model
 ```
 
+A model benchmark sends one tiny request before it starts and exits with status 2 if the server does not answer it
+properly, so a misconfigured server never produces a results table. If the model fails partway through, the cascade
+falls back to the mutation candidates it has not tried yet, so an outage cannot lose a bug the offline synthesizer
+fixes. The report then warns that the model failed in N bugs, and the run exits with status 1. Results with that
+warning are not model results.
+
 ## Security notes
 
 - Webhook: constant-time HMAC over the raw body first; delivery de-duplication; repository allow-list; clone URL never from the payload; branch and SHA validated against strict patterns.

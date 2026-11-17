@@ -13,6 +13,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -200,5 +201,87 @@ public class OpenAiCompatibleTests {
         assertEquals(SynthesizerConfig.Mode.MODEL_ONLY, SynthesizerConfig.Mode.parse("model-only"));
         assertEquals(SynthesizerConfig.Mode.CASCADE, SynthesizerConfig.Mode.parse("model"));
         assertThrows(IllegalArgumentException.class, () -> SynthesizerConfig.Mode.parse("gpt"));
+    }
+
+    // ------------------------------------------------------------------------------- when the model fails
+
+    /** Offers {@code left} candidates in total, one per call, then nothing; records each round it was asked for. */
+    private static final class Offline implements PatchSynthesizer {
+        int left;
+        final List<Integer> rounds = new ArrayList<>();
+
+        Offline(int left) {
+            this.left = left;
+        }
+
+        @Override
+        public String name() {
+            return "offline";
+        }
+
+        @Override
+        public Proposal propose(SynthRequest req) {
+            rounds.add(req.round());
+            if (left == 0) return new Proposal(List.of(), Usage.NONE);
+            left--;
+            return new Proposal(List.of(new Candidate("k" + left, "offline", "edit " + left, "X#m", "X.java", 1, "--- a/X\n+++ b/X\n")), Usage.NONE);
+        }
+    }
+
+    private static final PatchSynthesizer BROKEN_MODEL = new PatchSynthesizer() {
+        @Override
+        public String name() {
+            return "broken model";
+        }
+
+        @Override
+        public Proposal propose(SynthRequest req) throws IOException {
+            throw new IOException("model server returned 500: llama-server binary not found");
+        }
+    };
+
+    private static SynthRequest round(int r) {
+        return new SynthRequest(null, null, List.of(), List.of(), "", java.util.Set.of(), 4, r);
+    }
+
+    @Test
+    public void aModelOutageFallsBackToTheOfflineSynthesizerInsteadOfEndingTheRun() throws Exception {
+        // The laptop run that motivated this: Ollama answered 500 for every request, and bug 03, which the offline
+        // synthesizer fixes in round 3, was lost because round 3 went to the model and the error ended the run.
+        Offline offline = new Offline(3);
+        CascadeSynthesizer c = new CascadeSynthesizer(offline, BROKEN_MODEL, 2);
+        c.propose(round(1));
+        c.propose(round(2));
+        PatchSynthesizer.Proposal p = c.propose(round(3));
+        assertEquals(1, p.candidates().size());
+        assertTrue(p.notes().stream().anyMatch(n -> n.contains("model unavailable") && n.contains("llama-server")), p.notes().toString());
+        assertEquals(1, c.modelErrors());
+        assertEquals(List.of(1, 2, 3), offline.rounds);
+    }
+
+    @Test
+    public void whenTheOfflineSynthesizerHasNothingLeftTheModelErrorStillSurfaces() {
+        CascadeSynthesizer c = new CascadeSynthesizer(new Offline(0), BROKEN_MODEL, 2);
+        try {
+            c.propose(round(3));
+            throw new AssertionError("expected the model error to surface");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage().contains("llama-server"), expected.getMessage());
+        }
+        assertEquals(1, c.modelErrors());
+    }
+
+    @Test
+    public void aReportWithModelFailuresSaysSoInsteadOfLookingLikeModelResults() {
+        String report = dev.rakshit.repair.bench.Bench.report(List.of(), List.of(
+                new dev.rakshit.repair.bench.Bench.RepairResult("01", "operator", "dev", true, true, 2, 12, 14, 9_000, "ok", "replace > with >=", 0, 0, 0, 0),
+                new dev.rakshit.repair.bench.Bench.RepairResult("03", "operator", "dev", false, false, 3, 16, 17, 9_000,
+                        "unexpected failure: java.io.IOException: model server returned 500", "", 0, 0, 0, 1)),
+                "mutation first, then model: qwen2.5-coder:7b via http://localhost:11434/v1");
+        assertTrue(report.contains("Warning: the model failed in 1 of 2 bugs"), report);
+        assertTrue(report.contains("These are not model results."), report);
+        String clean = dev.rakshit.repair.bench.Bench.report(List.of(), List.of(
+                new dev.rakshit.repair.bench.Bench.RepairResult("01", "operator", "dev", true, true, 2, 12, 14, 9_000, "ok", "x", 0, 0, 0, 0)));
+        assertFalse(clean.contains("Warning"), clean);
     }
 }
