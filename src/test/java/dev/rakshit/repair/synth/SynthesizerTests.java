@@ -216,6 +216,9 @@ public class SynthesizerTests {
         assertEquals(1, llm.calls);
         assertEquals("LLM", late.candidates().get(0).operator());
         assertTrue(c.name().contains("then"));
+        // after the model's candidate, the untried mutations are still verified (no tokens spent on them)
+        assertTrue(late.candidates().size() > 1, late.candidates().toString());
+        assertTrue(late.candidates().stream().skip(1).noneMatch(x -> x.operator().equals("LLM")));
     }
 
     @Test

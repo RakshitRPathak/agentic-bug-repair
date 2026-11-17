@@ -35,8 +35,9 @@ public final class CascadeSynthesizer implements PatchSynthesizer {
             Proposal p = cheap.propose(req);
             if (!p.candidates().isEmpty()) return p;
         }
+        Proposal model;
         try {
-            return expensive.propose(req);
+            model = expensive.propose(req);
         } catch (IOException e) {
             modelErrors++;
             Proposal p = cheap.propose(req);
@@ -45,6 +46,18 @@ public final class CascadeSynthesizer implements PatchSynthesizer {
             notes.add("model unavailable (" + e.getMessage() + "); round " + req.round() + " used the offline synthesizer");
             return new Proposal(p.candidates(), p.usage(), notes);
         }
+        // The model's candidates go first, but the offline search keeps going behind them: verifying a mutation costs
+        // one test run and no tokens, and some single-edit bugs only surface after round 2 (the first laptop run with
+        // qwen2.5-coder:7b lost bug 03 that way while the model fixed bug 05, a bug mutation cannot fix).
+        Proposal offline = cheap.propose(req);
+        if (offline.candidates().isEmpty()) return model;
+        List<Candidate> merged = new ArrayList<>(model.candidates());
+        java.util.Set<String> keys = new java.util.HashSet<>();
+        for (Candidate c : merged) keys.add(c.key());
+        for (Candidate c : offline.candidates()) if (keys.add(c.key())) merged.add(c);
+        List<String> notes = new ArrayList<>(model.notes());
+        notes.addAll(offline.notes());
+        return new Proposal(merged, model.usage(), notes);
     }
 
     /** How many rounds the model failed to answer. */
